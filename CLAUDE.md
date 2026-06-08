@@ -14,6 +14,11 @@
 - Layer 6 (Supply Chain): 6 integrity checks (Docker pinning, dep pinning, lockfile, .gitignore, cosign, SBOM)
 - **Rust secrets scanner** (`rust/shipguard-secrets/`) — high-performance secrets scanning with Python parity tests
 - **External tool integrations** — ShellCheck, Semgrep, TruffleHog, Trivy (via `src/shipguard/integrations/`)
+- **MCP server** (`shipguard-mcp`) — exposes scan tools to AI agents via the Model Context Protocol
+- **AI false-positive reduction** (`ai.py`) — LLM-backed triage via litellm with diskcache caching
+- **Auto-remediation engine** (`fixer.py`) — generates and applies code patches via LLMs
+- **Semantic analysis engine** (`semantic.py`) — tree-sitter AST analysis for deeper rule matching
+- **Database layer** (`db.py`) — persistent state for scan history and findings
 - CLI tool for scanning repositories (`shipguard scan`, `shipguard scan-staged`)
 - SARIF output for GitHub Security tab integration
 - Pre-commit hook integration (full scan + staged-only)
@@ -26,6 +31,9 @@
 - Python 3.10+, Rust (secrets scanner crate)
 - Typer (CLI framework), Rich (terminal formatting)
 - PyYAML, Pydantic (config/data handling)
+- tree-sitter, tree-sitter-python, tree-sitter-javascript (semantic AST analysis)
+- litellm, diskcache (AI false-positive reduction and auto-remediation)
+- mcp (MCP server integration via FastMCP)
 - pytest + hypothesis (testing)
 - Hatchling (build system)
 
@@ -44,6 +52,9 @@ python -m build
 
 # Run as module
 python -m shipguard scan .
+
+# Run MCP server (for AI agent integration)
+shipguard-mcp
 
 # Build Rust secrets crate
 cd rust/shipguard-secrets && cargo build --release
@@ -118,6 +129,11 @@ shipguard/
 │   ├── models.py                   # Data models (Finding, Severity, ScanResult)
 │   ├── config.py                   # Configuration handling
 │   ├── rust_secrets.py             # Python bridge to Rust secrets scanner
+│   ├── ai.py                       # AI false-positive reduction (litellm + diskcache)
+│   ├── db.py                       # Persistent scan history / findings store
+│   ├── fixer.py                    # Auto-remediation: LLM-generated code patches
+│   ├── mcp_server.py               # MCP server (FastMCP) — agent-facing scan tools
+│   ├── semantic.py                 # Semantic AST analysis via tree-sitter
 │   ├── rules/                      # Security rules
 │   │   ├── __init__.py             # Rule registry and loader
 │   │   ├── config.py               # CFG rules (×5)
@@ -144,7 +160,7 @@ shipguard/
 │       ├── Cargo.toml
 │       ├── Cargo.lock
 │       └── src/
-├── tests/                          # Test suite (35 files)
+├── tests/                          # Test suite (36 files)
 │   ├── conftest.py
 │   ├── test_cli.py
 │   ├── test_cli_contract.py
@@ -154,6 +170,7 @@ shipguard/
 │   ├── test_concurrency.py
 │   ├── test_config_compatibility.py
 │   ├── test_config_extra.py
+│   ├── test_fixer.py
 │   ├── test_formatters_extra.py
 │   ├── test_formatters_sarif.py
 │   ├── test_golden_snapshots.py
@@ -197,6 +214,10 @@ shipguard/
 ├── .pre-commit-hooks.yaml
 ├── .pre-commit-config.yaml.template
 ├── action.yml                      # GitHub Action definition
+├── Dockerfile                      # Container image for shipguard
+├── docker-compose.staging.yml      # Staging environment compose config
+├── scripts/
+│   └── go_live_staging.sh          # Staging deployment script
 ├── pyproject.toml
 ├── Makefile
 ├── CONTRIBUTING.md
@@ -398,7 +419,7 @@ brew install shellcheck semgrep
 
 ---
 
-**Last Updated:** 2026-05-18
+**Last Updated:** 2026-06-03
 **Version:** 0.4.2
 **Maintained By:** DevOpsCelstn
 

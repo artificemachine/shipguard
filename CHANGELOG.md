@@ -104,3 +104,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 2026-05-18: chore(release): bump to v0.4.1 (litellm >=1.83.7 for CVE-2026-42208/42203 hygiene)
 - 2026-05-18: fix: resolve __version__ from installed package metadata (was hardcoded, drifted from pyproject.toml). Bump to v0.4.2.
 - 2026-05-18: docs(claude): bump CLAUDE.md version refs to 0.4.2 and add strict installation decoupling note.
+- 2026-06-08: fix(scan-staged): load .shipguard.yml project config in scan-staged command; apply exclude_paths filtering to staged files and pass config to scan_files so disable_rules and other settings are respected
+- 2026-06-08: docs(claude): document new modules (MCP server, AI triage, auto-remediation, semantic engine, db layer)
+- 2026-06-08: chore(release): bump to v0.4.3

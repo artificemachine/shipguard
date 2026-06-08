@@ -343,6 +343,18 @@ def scan_staged_cmd(
         typer.echo("No staged files to scan.")
         raise typer.Exit(0)
 
+    config = load_config(target_dir=resolved_path)
+
+    # Apply exclude_paths from config to staged files (mirrors _discover_files logic)
+    if config.exclude_paths:
+        import pathspec as _pathspec
+        _exclude_spec = _pathspec.PathSpec.from_lines("gitignore", config.exclude_paths)
+        staged = [f for f in staged if not _exclude_spec.match_file(str(f.relative_to(resolved_path)))]
+
+    if not staged:
+        typer.echo("No staged files to scan (all excluded by config).")
+        raise typer.Exit(0)
+
     try:
         threshold = Severity(severity.lower())
     except ValueError:
@@ -352,6 +364,7 @@ def scan_staged_cmd(
     result = scan_files(
         files=staged,
         target_dir=resolved_path,
+        config=config,
         severity_threshold=threshold,
     )
 
