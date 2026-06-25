@@ -107,3 +107,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 2026-06-08: fix(scan-staged): load .shipguard.yml project config in scan-staged command; apply exclude_paths filtering to staged files and pass config to scan_files so disable_rules and other settings are respected
 - 2026-06-08: docs(claude): document new modules (MCP server, AI triage, auto-remediation, semantic engine, db layer)
 - 2026-06-08: chore(release): bump to v0.4.3
+- 2026-06-25: chore: remove personal workspace path from tracked files
