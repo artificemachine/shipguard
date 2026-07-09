@@ -39,3 +39,10 @@ def custom_rule(file_path, content, config=None):
         load_custom_rules([custom_dir])
         rule_ids = {r.id for r in get_rules_for_file(Path("x.txt"))}
         assert "CUST-777" in rule_ids
+
+    def test_pii_001_applies_to_python_and_yaml(self):
+        load_builtin_rules()
+        py_ids = {r.id for r in get_rules_for_file(Path("x.py"))}
+        yml_ids = {r.id for r in get_rules_for_file(Path("x.yml"))}
+        assert "PII-001" in py_ids
+        assert "PII-001" in yml_ids

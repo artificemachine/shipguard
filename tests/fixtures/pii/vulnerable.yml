@@ -1,0 +1,10 @@
+---
+# TEST FIXTURE - Known-Vulnerable PII examples
+# Each line below is intentionally a true positive for its respective PII rule.
+# Excluded from the project self-scan via .shipguard.yml exclude_paths: tests/**
+
+ssn: 123-45-6789
+ssn_secondary: 456-78-9012
+card: 4111111111111111
+phone: 415-867-5309
+user_record: jane.doe@realcompany.io

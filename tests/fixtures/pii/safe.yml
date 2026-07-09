@@ -1,0 +1,8 @@
+---
+# TEST FIXTURE - Safe PII patterns (should produce zero findings)
+# Excluded from the project self-scan via .shipguard.yml exclude_paths: tests/**
+
+ssn: ${SSN}
+# ssn: 123-45-6789
+example_ssn: 000-00-0000
+placeholder_ssn: 666-12-3456

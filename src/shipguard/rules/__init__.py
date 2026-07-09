@@ -96,6 +96,7 @@ def load_builtin_rules() -> None:
     from shipguard.rules import config as _cfg  # noqa: F401
     from shipguard.rules import github_actions as _gha  # noqa: F401
     from shipguard.rules import javascript as _js  # noqa: F401
+    from shipguard.rules import pii as _pii  # noqa: F401
     from shipguard.rules import python as _py  # noqa: F401
     from shipguard.rules import secrets as _sec  # noqa: F401
     from shipguard.rules import shell as _sh  # noqa: F401

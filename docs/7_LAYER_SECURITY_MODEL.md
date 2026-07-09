@@ -60,6 +60,7 @@ osv-scanner --lockfile=package-lock.json
 - GitHub tokens and personal access tokens
 - Database passwords and connection strings
 - API keys and secrets
+- Hardcoded personal data (SSN, credit card, phone, email — see PII-001+)
 
 ### Implementation:
 
