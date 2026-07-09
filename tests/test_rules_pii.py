@@ -244,36 +244,7 @@ class TestPii004Email:
         assert findings == []
 
 
-class TestPiiFindingCap:
-    def test_pii_004_large_file_capped(self, tmp_path):
-        """A 1,000-row email seed file is capped at MAX_FINDINGS_PER_FILE + 1 with explicit notice."""
-        from shipguard.rules.pii import MAX_FINDINGS_PER_FILE, pii_004_email
-
-        seed = tmp_path / "seed.sql"
-        # 1,000 distinct non-allowlisted emails
-        lines = [f"INSERT INTO users (email) VALUES ('user{i}@realcompany.io');" for i in range(1000)]
-        seed.write_text("\n".join(lines))
-
-        findings = pii_004_email(seed, seed.read_text())
-        assert len(findings) == MAX_FINDINGS_PER_FILE + 1, (
-            f"expected {MAX_FINDINGS_PER_FILE + 1} findings, got {len(findings)}"
-        )
-        last = findings[-1]
-        assert "further PII-004 matches suppressed" in last.message
-        assert "1000" in last.message  # names the true total
-
-    def test_cap_not_triggered_below_threshold(self, tmp_path):
-        """A 5-row file yields exactly 5 findings and no suppression notice."""
-        from shipguard.rules.pii import pii_004_email
-
-        seed = tmp_path / "small.sql"
-        lines = [f"INSERT INTO users (email) VALUES ('user{i}@realcompany.io');" for i in range(5)]
-        seed.write_text("\n".join(lines))
-
-        findings = pii_004_email(seed, seed.read_text())
-        assert len(findings) == 5
-        assert all("further" not in f.message for f in findings)
-
+class TestPiiExtensions:
     def test_csv_excluded_from_pii_dispatch(self):
         """.csv is excluded from PII_EXTS — no PII-* rule applies."""
         from shipguard.rules import get_rules_for_file
