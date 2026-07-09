@@ -98,6 +98,43 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Refactored core engine to support semantic plugins and AI reasoning layers.
 - Expanded rule registry to 60 built-in security patterns.
 
+## Retroactive notes
+
+These are corrections or clarifications added after the original release. Listed in chronological order of the release they apply to (oldest first), with a link to the version that introduced the fix.
+
+### v0.5.0 — PII suppression notice used `Severity.LOW` (fixed in v0.5.1)
+
+The PII-local cap (`MAX_FINDINGS_PER_FILE = 100` in `pii.py`, deleted in v0.5.1) emitted its suppression notice at `Severity.LOW`. Users on the default `MEDIUM` severity threshold never saw the notice, so a scan that capped at 100 PII findings showed only 100 with no indication of the 900 suppressed.
+
+**Reproduction (against the v0.5.0 wheel):**
+
+```python
+from shipguard.rules.pii import pii_004_email
+from pathlib import Path
+
+content = '\n'.join(f"user{i}@realcompany.io" for i in range(1000))
+findings = pii_004_email(Path("seed.sql"), content)
+# Returns 100 findings + 1 notice = 101 in the rule function's output.
+# But `scan()` applies severity_threshold=medium (default), and
+# Severity.LOW < medium, so the notice is dropped from `result.findings`.
+# The user sees 100 PII findings with no suppression notice.
+```
+
+**Why this matters:** users on v0.5.0 who relied on the implicit "PII cap of 100 always on" got the cap, but never knew it was hitting. A user looking at a v0.5.0 scan output of "100 PII findings" would have no way to know whether the file actually had 100 PII or 1,000,000.
+
+**Fix in v0.5.1:** `engine._cap_findings_per_file` uses `Severity.MEDIUM` for the notice (visible by default). The v0.5.1 cap mechanism was also moved to the engine layer (issue #19) and made opt-in via `Config.max_findings_per_file: 0` (unlimited) by default — restoring pre-v0.5.0 behaviour for users who don't want any cap.
+
+**Action for v0.5.0 users:** upgrade to v0.5.1, or run scans with `--severity low` to see the notice.
+
+**References:**
+- Issue #27 (this retroactive note)
+- PR #24 (v0.5.1 fix)
+- [Release notes for v0.5.1](https://github.com/celstnblacc/shipguard/releases/tag/v0.5.1)
+- `docs/ADR-pii-detection.md` §6 (the surviving decision record)
+- `docs/PLAN-engine-cap.md` §3 Iteration 1 (the cap design that was promoted to MEDIUM mid-implementation)
+
+---
+
 ## [Unreleased]
 ### Security
 - Bump `litellm` to `>=1.83.7` to cover CVE-2026-42208 (pre-auth SQLi) and CVE-2026-42203 (SSTI). ShipGuard uses the SDK only; not exploitable, hygiene bump.
@@ -122,3 +159,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 2026-07-09: fix(ci): bump CodeQL action to v3.28.0 (broken SHA was failing 4 jobs); convert .gitleaks.toml paths to RE2 regex (gitleaks 8.25+ no longer accepts globs)
 - 2026-07-09: docs: update HANDOFF for v0.5.1 (engine-level cap shipped)
 - 2026-07-09: chore(cleanup): remove redundant test_rules_pii_cap_unit.py (the boundary test is now covered by test_engine_cap.py::test_cap_disabled_when_zero)
+- 2026-07-09: docs: retroactive note for v0.5.0 PII notice invisibility (issue #27); ADR-pii-detection.md cap section now references the severity choice
