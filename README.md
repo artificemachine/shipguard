@@ -208,7 +208,7 @@ ShipGuard implements a **unified security model** across all 7 layers of the sof
 
 ---
 
-## Rules (62 total)
+## Rules (64 total)
 
 | Category | Layer | Count | IDs | Examples |
 |----------|-------|-------|-----|----------|
@@ -218,7 +218,7 @@ ShipGuard implements a **unified security model** across all 7 layers of the sof
 | GitHub Actions | L3 | 5 | GHA-001–005 | workflow injection, unpinned actions, secrets in logs |
 | Config | L3 | 3 | CFG-001–003 | auto-approve, committed .env, permissive CORS |
 | **Secrets** | **L2** | **15** | **SEC-001–015** | **Cloud/API tokens and other hardcoded secret patterns** |
-| **PII** | **L2** | **2** | **PII-001–002** | **Personal data (SSN, credit card) hardcoded in source/data files** |
+| **PII** | **L2** | **4** | **PII-001–004** | **Personal data (SSN, credit card, phone, email) hardcoded in source/data files** |
 | **Supply Chain** | **L6** | **4** | **SC-001–004** | **Docker :latest, unpinned deps, npm lockfiles, missing .gitignore entries** |
 
 Run `shipguard list-rules` or `shipguard list-rules --format json` for full details.

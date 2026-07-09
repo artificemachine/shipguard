@@ -175,7 +175,7 @@ class TestListRulesCommand:
         assert result.exit_code == 0
         import json
         rules = json.loads(result.output)
-        assert len(rules) == 62
+        assert len(rules) == 64
         ids = {r["id"] for r in rules}
         assert "SHELL-001" in ids
         assert "CFG-003" in ids
@@ -190,6 +190,8 @@ class TestListRulesCommand:
         assert "SC-004" in ids
         assert "PII-001" in ids
         assert "PII-002" in ids
+        assert "PII-003" in ids
+        assert "PII-004" in ids
         # New rules from Phase 2
         assert "SC-005" in ids
         assert "SC-006" in ids

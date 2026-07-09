@@ -26,7 +26,7 @@ A comprehensive security strategy requires defense at all layers. This document 
 - `.env` file auditing — ensures sensitive files are gitignored
 - Pre-commit hooks — block commits with credential patterns
 
-**ShipGuard Coverage:** SEC-001 to SEC-010 (cloud/API credentials and token patterns)
+**ShipGuard Coverage:** SEC-001 to SEC-010 (cloud/API credentials and token patterns), PII-001 to PII-004 (SSN, credit card, phone, email — personal data patterns)
 
 ---
 

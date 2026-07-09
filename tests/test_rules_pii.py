@@ -138,3 +138,156 @@ class TestPii002CreditCard:
         assert "PCI-3.4" in meta.compliance_tags
         assert "GDPR-Art32" in meta.compliance_tags
         assert "SOC2-CC6.1" in meta.compliance_tags
+
+
+class TestPii003Phone:
+    def test_pii_003_detects_phone(self):
+        """PII-003 detects a NANP-formatted phone number."""
+        from shipguard.rules.pii import pii_003_phone
+
+        findings = pii_003_phone(Path("x.yml"), "phone: 415-867-5309")
+        assert len(findings) == 1
+        f = findings[0]
+        assert f.rule_id == "PII-003"
+        assert f.severity == Severity.LOW
+        assert f.cwe_id == "CWE-359"
+
+    def test_pii_003_skips_fictional_555_range(self):
+        """NANP reserved fictional 555-0100 to 555-0199 is skipped."""
+        from shipguard.rules.pii import pii_003_phone
+
+        for fictional in ("415-555-0142", "212-555-0199", "555-0100"):
+            findings = pii_003_phone(Path("x.yml"), f"phone: {fictional}")
+            assert findings == [], f"expected 0 findings for NANP fictional {fictional!r}"
+
+    @pytest.mark.parametrize(
+        "placeholder",
+        [
+            "000-000-0000",
+            "123-456-7890",
+            "111-111-1111",
+            "555-555-5555",   # not in NANP fictional range — explicit placeholder
+            "800-555-1212",   # not in NANP fictional range — explicit placeholder
+        ],
+    )
+    def test_pii_003_skips_placeholder(self, placeholder):
+        """Known placeholder phone numbers produce zero findings.
+
+        `555-555-5555` and `800-555-1212` match the PII-003 regex and fall
+        outside the 555-0100–555-0199 fictional range, so the range check alone
+        does not skip them — the PLACEHOLDER_PHONES set does.
+        """
+        from shipguard.rules.pii import pii_003_phone
+
+        findings = pii_003_phone(Path("x.yml"), f"phone: {placeholder}")
+        assert findings == [], f"expected 0 findings for placeholder {placeholder!r}"
+
+    @pytest.mark.parametrize(
+        "formatted",
+        [
+            "555.555.5555",
+            "(555) 555-5555",
+        ],
+    )
+    def test_pii_003_separator_normalisation(self, formatted):
+        """PLACEHOLDER_PHONES skips by normalised digits — separator-form does not slip through."""
+        from shipguard.rules.pii import pii_003_phone
+
+        findings = pii_003_phone(Path("x.yml"), f"phone: {formatted}")
+        assert findings == [], f"expected 0 findings for normalised-placeholder {formatted!r}"
+
+
+class TestPii004Email:
+    def test_pii_004_detects_email(self):
+        """PII-004 detects a real-looking email in source/data files."""
+        from shipguard.rules.pii import pii_004_email
+
+        findings = pii_004_email(Path("x.py"), "user_record: jane.doe@realcompany.io")
+        assert len(findings) == 1
+        f = findings[0]
+        assert f.rule_id == "PII-004"
+        assert f.severity == Severity.MEDIUM
+        assert f.cwe_id == "CWE-359"
+
+    @pytest.mark.parametrize(
+        "email",
+        ["user@example.com", "user@example.org", "test@test.com"],
+    )
+    def test_pii_004_skips_example_domains(self, email):
+        """RFC-2606 reserved example domains are skipped."""
+        from shipguard.rules.pii import pii_004_email
+
+        findings = pii_004_email(Path("x.py"), f"user: {email}")
+        assert findings == [], f"expected 0 findings for example-domain {email!r}"
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "author: jane@realcompany.io",
+            '"author": "jane@realcompany.io"',
+            "maintainer: bob@realcompany.io",
+            "email: dev@realcompany.io",
+        ],
+    )
+    def test_pii_004_skips_public_metadata_keys(self, line):
+        """Package metadata keys whose value is intentionally public are skipped."""
+        from shipguard.rules.pii import pii_004_email
+
+        findings = pii_004_email(Path("x.py"), line)
+        assert findings == [], f"expected 0 findings for public-metadata line {line!r}"
+
+    def test_pii_004_skips_noreply_addresses(self):
+        """GitHub noreply addresses are skipped."""
+        from shipguard.rules.pii import pii_004_email
+
+        findings = pii_004_email(Path("x.py"), "user: 12345+jane@users.noreply.github.com")
+        assert findings == []
+
+
+class TestPiiFindingCap:
+    def test_pii_004_large_file_capped(self, tmp_path):
+        """A 1,000-row email seed file is capped at MAX_FINDINGS_PER_FILE + 1 with explicit notice."""
+        from shipguard.rules.pii import MAX_FINDINGS_PER_FILE, pii_004_email
+
+        seed = tmp_path / "seed.sql"
+        # 1,000 distinct non-allowlisted emails
+        lines = [f"INSERT INTO users (email) VALUES ('user{i}@realcompany.io');" for i in range(1000)]
+        seed.write_text("\n".join(lines))
+
+        findings = pii_004_email(seed, seed.read_text())
+        assert len(findings) == MAX_FINDINGS_PER_FILE + 1, (
+            f"expected {MAX_FINDINGS_PER_FILE + 1} findings, got {len(findings)}"
+        )
+        last = findings[-1]
+        assert "further PII-004 matches suppressed" in last.message
+        assert "1000" in last.message  # names the true total
+
+    def test_cap_not_triggered_below_threshold(self, tmp_path):
+        """A 5-row file yields exactly 5 findings and no suppression notice."""
+        from shipguard.rules.pii import pii_004_email
+
+        seed = tmp_path / "small.sql"
+        lines = [f"INSERT INTO users (email) VALUES ('user{i}@realcompany.io');" for i in range(5)]
+        seed.write_text("\n".join(lines))
+
+        findings = pii_004_email(seed, seed.read_text())
+        assert len(findings) == 5
+        assert all("further" not in f.message for f in findings)
+
+    def test_csv_excluded_from_pii_dispatch(self):
+        """.csv is excluded from PII_EXTS — no PII-* rule applies."""
+        from shipguard.rules import get_rules_for_file
+
+        load_builtin_rules()
+        rule_ids = {r.id for r in get_rules_for_file(Path("x.csv"))}
+        pii_ids = {r for r in rule_ids if r.startswith("PII-")}
+        assert pii_ids == set(), f"expected no PII-* on .csv, got {pii_ids}"
+
+    def test_log_excluded_from_pii_dispatch(self):
+        """.log is excluded from PII_EXTS — no PII-* rule applies."""
+        from shipguard.rules import get_rules_for_file
+
+        load_builtin_rules()
+        rule_ids = {r.id for r in get_rules_for_file(Path("x.log"))}
+        pii_ids = {r for r in rule_ids if r.startswith("PII-")}
+        assert pii_ids == set(), f"expected no PII-* on .log, got {pii_ids}"
