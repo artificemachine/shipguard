@@ -117,3 +117,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 2026-07-09: chore(repo): commit post-merge session artifacts (SOUL.md, docs/ADR-pii-detection.md, HANDOFF.md)
 - 2026-07-09: docs: add PLAN-engine-cap (engine-level max_findings_per_file; implements issue #19)
 - 2026-07-09: feat(engine): add configurable max_findings_per_file cap (engine-level)
+- 2026-07-09: refactor(rules): remove PII-local _cap_findings (subsumed by engine-level cap)

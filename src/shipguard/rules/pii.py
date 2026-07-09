@@ -76,7 +76,11 @@ PUBLIC_METADATA_KEYS = frozenset({
 # Per-file cap on findings emitted by any single PII rule. Bounds the worst-case
 # output for files like .sql dumps or .json fixtures that can hold dense PII.
 # The cap emits an explicit suppression notice — never truncates silently.
-MAX_FINDINGS_PER_FILE = 100
+# Note: as of v0.5.1, the cap is engine-level (see
+# shipguard.engine._cap_findings_per_file and Config.max_findings_per_file).
+# The PII-local MAX_FINDINGS_PER_FILE / _cap_findings helper was removed in
+# v0.5.1; the comment block above is preserved as a historical marker.
+# Delete this block in v0.6+ if a clean baseline is desired.
 
 
 def _luhn_valid(digits: str) -> bool:
@@ -111,29 +115,6 @@ def _line_starts_with_key(line: str, keys: frozenset[str]) -> bool:
     return False
 
 
-def _cap_findings(findings: list[Finding], rule_id: str, file_path: Path) -> list[Finding]:
-    """Cap `findings` at MAX_FINDINGS_PER_FILE; append explicit suppression notice if truncated.
-
-    Never silent — the +1 finding names the suppressed total and points at the
-    repo-level opt-out mechanisms (exclude_paths, disable_rules).
-    """
-    total = len(findings)
-    if total <= MAX_FINDINGS_PER_FILE:
-        return findings
-    kept = findings[:MAX_FINDINGS_PER_FILE]
-    last_line = kept[-1].line_number if kept else 1
-    kept.append(_make_finding(
-        rule_id, Severity.LOW, file_path, last_line,
-        f"(suppression notice for {rule_id})",
-        f"{total - MAX_FINDINGS_PER_FILE} further {rule_id} matches suppressed in this file "
-        f"({total} total). Add the path to exclude_paths, or {rule_id} to disable_rules, "
-        f"in .shipguard.yml.",
-        "CWE-359",
-        "Cap is a safety net, not a fix — exclude the file or disable the rule if the data is intentional.",
-    ))
-    return kept
-
-
 @register(
     id="PII-001",
     name="us-ssn",
@@ -157,7 +138,7 @@ def pii_001_ssn(
                 "CWE-359",
                 "Remove the SSN from source; if this is test data, use a clearly fake value (e.g. 000-00-0000) or move it to an ignored fixture path",
             ))
-    return _cap_findings(findings, "PII-001", file_path)
+    return findings
 
 
 @register(
@@ -191,7 +172,7 @@ def pii_002_credit_card(
                 "CWE-359",
                 "Remove the card number and rotate it with the issuer; store payment data only in a PCI-DSS-compliant vault",
             ))
-    return _cap_findings(findings, "PII-002", file_path)
+    return findings
 
 
 @register(
@@ -229,7 +210,7 @@ def pii_003_phone(
                 "CWE-359",
                 "If this is real customer PII, remove it; if it is test data, use a placeholder (e.g. 000-000-0000)",
             ))
-    return _cap_findings(findings, "PII-003", file_path)
+    return findings
 
 
 @register(
@@ -263,4 +244,4 @@ def pii_004_email(
                 "CWE-359",
                 "If this is real customer PII, remove it; if it is intentional, exclude the file in .shipguard.yml",
             ))
-    return _cap_findings(findings, "PII-004", file_path)
+    return findings

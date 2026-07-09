@@ -194,17 +194,14 @@ class TestEngineIntegration:
         assert "further" in result.findings[-1].message
 
     def test_scan_with_default_config_unaffected(self, tmp_path):
-        """scan() with default config + low severity threshold = 101 findings.
+        """scan() with default config emits 1000 findings (cap=0 = unlimited).
 
-        With default config (cap=0), the engine cap is a no-op. The
-        PII-local cap (100, hardcoded) is still active. With severity
-        threshold LOW (to bypass the default MEDIUM filter, which would
-        drop the LOW-severity PII notice), the result is 100 real PII
-        findings + 1 PII suppression notice = 101. The engine cap
-        contributed nothing here.
+        With the PII-local cap deleted in Iteration 2 and the engine
+        cap defaulting to 0, default-config users get every PII-004
+        finding on a 1000-email file. No suppression notice. The
+        cap is opt-in via max_findings_per_file: 100 (or any value)
+        in .shipguard.yml, not the new default.
         """
-        from shipguard.models import Severity
-
         seed = tmp_path / "seed.sql"
         lines = [
             f"INSERT INTO users (email) VALUES ('user{i}@realcompany.io');"
@@ -212,7 +209,7 @@ class TestEngineIntegration:
         ]
         seed.write_text("\n".join(lines))
 
-        result = scan(tmp_path, severity_threshold=Severity.LOW)
-        assert len(result.findings) == 101
-        # The PII-local cap's notice is the last finding.
-        assert "further" in result.findings[-1].message
+        result = scan(tmp_path)
+        # No cap -> all 1000 PII-004 findings, no notice.
+        assert len(result.findings) == 1000
+        assert all("further" not in f.message for f in result.findings)
