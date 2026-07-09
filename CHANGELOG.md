@@ -112,3 +112,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 2026-07-09: Add PII-001 SSN detection rule
 - 2026-07-09: Add PII-002 credit card number detection with Luhn validation
 - 2026-07-09: Add PII-003 phone number and PII-004 email address detection
+- 2026-07-09: chore(release): bump to v0.5.0 (PII rule category)
