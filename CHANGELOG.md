@@ -108,3 +108,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 2026-06-08: docs(claude): document new modules (MCP server, AI triage, auto-remediation, semantic engine, db layer)
 - 2026-06-08: chore(release): bump to v0.4.3
 - 2026-06-25: chore: remove personal workspace path from tracked files
+- 2026-07-09: Extract shared rule helpers to rules/_common.py (no behaviour change)
