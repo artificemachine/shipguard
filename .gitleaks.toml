@@ -5,10 +5,15 @@ title = "ShipGuard Gitleaks Config"
 
 [allowlist]
 description = "Exclude test fixtures (intentionally contain vulnerable patterns) and build artifacts"
+# gitleaks 8.25+ uses RE2 regex syntax in `paths`, not globs. `*` must be
+# escaped or expressed as a character class. The original `*.egg-info/`
+# glob caused gitleaks 8.x to panic with "no argument for repetition
+# operator". See docs/ADR-pii-detection.md for the format-exclusion
+# context (PII plans deferred `.egg-info` from PII_EXTS).
 paths = [
-    "tests/fixtures/",
-    "dist/",
-    ".venv/",
-    "build/",
-    "*.egg-info/",
+    '''tests/fixtures/''',
+    '''dist/''',
+    '''\.venv/''',
+    '''build/''',
+    '''(?:^|/)[^/]+\.egg-info/''',
 ]

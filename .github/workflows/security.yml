@@ -138,7 +138,7 @@ jobs:
         if: always()
 
       - name: Upload SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@f09c1c0a46b326c31cf5a0e0b80d2a83a13e6b26 # v3
+        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
         with:
           sarif_file: results.sarif
         if: always()
@@ -180,7 +180,7 @@ jobs:
       - name: Run ShipGuard with external tools (SARIF output)
         run: shipguard scan . --with-external --format sarif --output external-sast.sarif || true
       - name: Upload external SARIF
-        uses: github/codeql-action/upload-sarif@f09c1c0a46b326c31cf5a0e0b80d2a83a13e6b26 # v3
+        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
         with:
           sarif_file: external-sast.sarif
         if: always()
@@ -199,7 +199,7 @@ jobs:
       - name: Run Trivy filesystem scan
         run: trivy fs --format sarif --output trivy.sarif . || true
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@f09c1c0a46b326c31cf5a0e0b80d2a83a13e6b26 # v3
+        uses: github/codeql-action/upload-sarif@8c78abb9b62512e3c45dea6559ffd924ed8549c8 # v3.28.0
         with:
           sarif_file: trivy.sarif
         if: always()
