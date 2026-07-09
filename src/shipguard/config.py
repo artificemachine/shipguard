@@ -36,6 +36,11 @@ custom_rules_dirs: []
 # Requires a built `shipguard-secrets` binary in PATH or SHIPGUARD_RUST_SECRETS_BIN.
 use_rust_secrets: false
 
+# Cap on findings per file (0 = unlimited). When the cap is hit, a synthesized
+# suppression notice is emitted naming the true suppressed total and pointing at
+# exclude_paths and disable_rules in this file. Never silent truncation.
+# max_findings_per_file: 100
+
 # Per-rule configuration overrides
 # rule_config:
 #   PY-011:
@@ -56,6 +61,7 @@ class Config(BaseModel):
     external_tools: list[str] = Field(default_factory=list)
     trufflehog_verify: bool = Field(default=False)
     semgrep_config: str = Field(default="auto")
+    max_findings_per_file: int = Field(default=0, ge=0)
 
 
 def find_config(target_dir: Path) -> Path | None:

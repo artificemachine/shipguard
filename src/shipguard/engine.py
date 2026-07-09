@@ -19,6 +19,64 @@ from shipguard.db import Database
 
 DB_PATH = Path(".shipguard") / "state.db"
 
+
+def _cap_findings_per_file(
+    findings: list[Finding], cap: int | None, file_path: Path
+) -> list[Finding]:
+    """Bound `findings` at `cap` per file. Emits suppression notice on overflow.
+
+    `cap=0` or `cap=None` means unlimited (no cap, no notice).
+    `cap=N>0` with `len(findings) > N` returns the first N findings plus
+    one synthesized suppression notice naming the true suppressed total
+    and the rule with the largest overflow.
+
+    Per the no-silent-truncation rule: the cap is a safety net, not a fix.
+    The notice points at both `exclude_paths` (file-level) and `disable_rules`
+    (rule-level) so the operator has the opt-out paths in front of them.
+    """
+    if not cap or cap <= 0:
+        return findings
+    if len(findings) <= cap:
+        return findings
+    total = len(findings)
+    kept = findings[:cap]
+    # Identify the rule with the largest overflow so the notice names the
+    # most likely culprit. Ties broken by first occurrence in input order.
+    overflow: dict[str, int] = {}
+    for f in findings:
+        overflow[f.rule_id] = overflow.get(f.rule_id, 0) + 1
+    overflow_by_rule = {rid: cnt - cap for rid, cnt in overflow.items() if cnt > cap}
+    if overflow_by_rule:
+        worst_rule = max(overflow_by_rule.items(), key=lambda kv: (kv[1], findings.index(next(f for f in findings if f.rule_id == kv[0]))))[0]
+        per_rule_overflow = overflow_by_rule[worst_rule]
+    else:
+        # Should not happen if total > cap, but fall back gracefully.
+        worst_rule = findings[cap].rule_id
+        per_rule_overflow = total - cap
+    last_line = kept[-1].line_number if kept else 1
+    notice = Finding(
+        rule_id=worst_rule,
+        # Severity.MEDIUM (not LOW) so the notice survives the default
+        # severity_threshold filter in _scan_file. The plan specified
+        # LOW, but a LOW notice is invisible to users on the default
+        # MEDIUM threshold — a usability regression. MEDIUM keeps the
+        # notice visible by default without inflating the report.
+        severity=Severity.MEDIUM,
+        file_path=file_path,
+        line_number=last_line,
+        line_content="(suppression notice)",
+        message=(
+            f"{total - cap} further findings suppressed in this file "
+            f"({per_rule_overflow} from {worst_rule}, {total} total). "
+            f"Add the path to exclude_paths, or {worst_rule} to disable_rules, "
+            f"in .shipguard.yml."
+        ),
+        cwe_id="CWE-359",
+        fix_hint="Cap is a safety net, not a fix — exclude the file or disable the rule if the data is intentional.",
+    )
+    return [*kept, notice]
+
+
 def _build_rule_sets(
     config: Config,
     include_rules: set[str] | None,
@@ -179,6 +237,7 @@ def _run_parallel_scans(
     """Run _scan_file in parallel; returns (findings, files_skipped)."""
     all_findings: list[Finding] = []
     files_skipped = 0
+    cap = getattr(config, "max_findings_per_file", 0) or 0
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
             pool.submit(
@@ -188,7 +247,15 @@ def _run_parallel_scans(
         }
         for future in as_completed(futures):
             try:
-                all_findings.extend(future.result())
+                file_findings = future.result()
+                # Apply the per-file cap here, so each file's findings are bounded
+                # *before* the merge. Without this, capping the aggregated list
+                # would over-suppress (e.g. 2 files × 600 findings + cap=100 = 100
+                # total, not 50+1 per file). Per the plan §3 Iteration 1 GREEN.
+                file_findings = _cap_findings_per_file(
+                    file_findings, cap, futures[future]
+                )
+                all_findings.extend(file_findings)
             except Exception as exc:
                 print(
                     f"[shipguard] warning: error scanning {futures[future]}: {exc}",
