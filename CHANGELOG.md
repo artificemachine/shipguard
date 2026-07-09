@@ -120,3 +120,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 2026-07-09: refactor(rules): remove PII-local _cap_findings (subsumed by engine-level cap)
 - 2026-07-09: chore(release): bump to v0.5.1 (engine-level max_findings_per_file cap)
 - 2026-07-09: fix(ci): bump CodeQL action to v3.28.0 (broken SHA was failing 4 jobs); convert .gitleaks.toml paths to RE2 regex (gitleaks 8.25+ no longer accepts globs)
+- 2026-07-09: docs: update HANDOFF for v0.5.1 (engine-level cap shipped)
