@@ -33,7 +33,7 @@ This installs ShipGuard in an isolated environment with global command access.
 ### From source (development)
 
 ```bash
-git clone https://github.com/celstnblacc/shipguard.git
+git clone https://github.com/artificemachine/shipguard.git
 cd shipguard
 python -m venv .venv
 source .venv/bin/activate
@@ -49,13 +49,13 @@ python3 -m venv .venv && source .venv/bin/activate && pip install shipguard
 ### Install from GitHub (correct URL syntax)
 
 ```bash
-pip install "git+https://github.com/celstnblacc/shipguard.git"
+pip install "git+https://github.com/artificemachine/shipguard.git"
 ```
 
 You can pin to a branch/tag/commit:
 
 ```bash
-pip install "git+https://github.com/celstnblacc/shipguard.git@v0.4.0"
+pip install "git+https://github.com/artificemachine/shipguard.git@v0.4.0"
 ```
 
 After install:
@@ -333,7 +333,7 @@ eval $cmd  # shipguard:ignore SHELL-001, SHELL-002
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/celstnblacc/shipguard
+  - repo: https://github.com/artificemachine/shipguard
     rev: v0.4.0
     hooks:
       - id: shipguard
@@ -342,7 +342,7 @@ repos:
 ### GitHub Action
 
 ```yaml
-- uses: celstnblacc/shipguard@v0.4.0
+- uses: artificemachine/shipguard@v0.4.0
   with:
     severity: medium
     format: terminal
@@ -476,7 +476,7 @@ pre-commit run --all-files  # Test manually
 To contribute or modify rules:
 
 ```bash
-git clone https://github.com/celstnblacc/shipguard.git
+git clone https://github.com/artificemachine/shipguard.git
 cd shipguard
 python -m venv .venv
 source .venv/bin/activate

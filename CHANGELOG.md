@@ -160,3 +160,4 @@ findings = pii_004_email(Path("seed.sql"), content)
 - 2026-07-09: docs: update HANDOFF for v0.5.1 (engine-level cap shipped)
 - 2026-07-09: chore(cleanup): remove redundant test_rules_pii_cap_unit.py (the boundary test is now covered by test_engine_cap.py::test_cap_disabled_when_zero)
 - 2026-07-09: docs: retroactive note for v0.5.0 PII notice invisibility (issue #27); ADR-pii-detection.md cap section now references the severity choice
+- 2026-07-11: fix: repo URLs pointed to celstnblacc/shipguard (stale org); corrected to artificemachine/shipguard in pyproject.toml, README.md, CONTRIBUTING.md, CLAUDE.md, SECURITY.md, sarif.py

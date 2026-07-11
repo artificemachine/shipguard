@@ -80,7 +80,7 @@ def format_sarif(result: ScanResult, **_kwargs) -> str:
                     "driver": {
                         "name": "shipguard",
                         "version": _shipguard_version,
-                        "informationUri": "https://github.com/celstnblacc/shipguard",
+                        "informationUri": "https://github.com/artificemachine/shipguard",
                         "rules": sarif_rules,
                     }
                 },
