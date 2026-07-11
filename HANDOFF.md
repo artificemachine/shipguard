@@ -1,5 +1,49 @@
-# Session Handoff — 2026-07-09 (Engine-level finding cap shipped v0.5.1)
-Agent: OpenCode (MiniMax-M3) | Branch: main | Tests: 418 pass, 4 skip, 0 xfailed | COMMITTED (1b5e8c8) | v0.5.1 tagged, PyPI live
+# Session Handoff — 2026-07-11 (org migration fix: celstnblacc → artificemachine, v0.5.2)
+Agent: Claude Code (Sonnet 5) | Branch: main | Tests: 417 pass, 4 skip, 0 xfailed | COMMITTED (215e024) | v0.5.2 tagged, released, PyPI live
+
+## What happened this session
+- Found `origin` remote is `github.com/artificemachine/shipguard`, but repo URLs still referenced the old `celstnblacc` org: `pyproject.toml` (Homepage/Repository/Changelog/Bug Tracker/Security Policy), `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `SECURITY.md`, `src/shipguard/formatters/sarif.py`'s `informationUri`. Fixed all six via PR #30 (`06702d2` → squash-merged `215e024`). Left `CHANGELOG.md` untouched (append-only) and `HANDOFF.md` untouched at the time (historical session log). Left README's `celstnblacc/spec-kit` and `celstnblacc/superpowers` refs alone — different repos, actually still under that org.
+- Version bump `0.5.1` → `0.5.2` (patch, docs-only fix). Tagged `v0.5.2`, GitHub release published: https://github.com/artificemachine/shipguard/releases/tag/v0.5.2
+- PyPI publish via CI failed: `invalid-publisher` OIDC error. Root cause — same org migration, one layer deeper: PyPI's trusted-publisher config for the `shipguard` project still pointed at `celstnblacc/shipguard`, so the `artificemachine/shipguard` workflow's OIDC claims didn't match. Published `v0.5.2` manually via `twine upload --repository shipguard` as a stopgap (required fixing `~/.pypirc` first — `[shipguard]` section was missing a `repository =` key and `[distutils]` was missing `index-servers`; both now fixed).
+- Fixed the PyPI trusted-publisher config itself (via browser, pypi.org project settings → Publishing): added `artificemachine/shipguard` (workflow `publish.yml`, env `pypi`) as a trusted publisher, removed the stale `celstnblacc/shipguard` entry. Re-ran the failed publish workflow run (29152036152) to confirm — OIDC exchange now succeeds; it only fails afterward with `400 Bad Request` because `v0.5.2` already exists on PyPI (expected, from the manual upload). **Next real tag push will publish cleanly via CI with no manual steps.**
+- Also found `shipguard --version` printing `0.5.0` locally — false alarm, not a code bug. `src/shipguard/__init__.py` correctly reads version from installed package metadata (`importlib.metadata.version("shipguard")`). The stale `0.5.0` was a separate `pipx`-installed venv (`~/.local/pipx/venvs/shipguard`) that predated this session and hadn't been upgraded. Ran `pipx upgrade shipguard` → now correctly reports `0.5.2`. (There's also a pyenv 3.11.6 site-packages install, upgraded separately via `pip install shipguard==0.5.2` for the reinstall verification — two independent shipguard installs exist on this machine, keep both in mind if `--version` looks stale again.)
+- Doc sweep: updated 3 stale `v0.4.0`-pinned examples in `README.md` (pip install, pre-commit `rev:`, GitHub Action `uses:`) to `v0.5.2`. Updated `CLAUDE.md`'s two `**Version:**` stamps (0.4.2 → 0.5.2, both stale — hadn't been bumped since well before v0.5.0/PII rules shipped) and `**Last Updated:**` date.
+
+## Next session — first moves
+1. **`CLAUDE.md` rule-count drift not yet fixed.** It still says "60 built-in security rules" / "60 security vulnerability patterns" (lines 5, 11) — actual count is 64 (`shipguard list-rules --format json` confirms), missing the 4 PII-* rules added in v0.5.0. Flagged but not fixed this session — deeper content rewrite of a protected instruction file, wanted explicit go-ahead beyond the version-stamp bump that was approved. Needs an operator decision on scope (just the count, or a fuller Key Features rewrite adding the PII-* rule category).
+2. **Two independent local `shipguard` installs exist**: pyenv 3.11.6 site-packages (`pip install`) and a `pipx` venv. Both now at 0.5.2 as of this session, but they drift independently — future `--version` staleness is almost certainly one of these two lagging, not a code bug.
+3. No engine-cap or PII-arc follow-up remains open (carried over from the prior handoff below — still true).
+
+### Operational notes
+- **PyPI trusted publisher for `shipguard`**: now `artificemachine/shipguard`, workflow `publish.yml`, env `pypi`. Configured at https://pypi.org/manage/project/shipguard/settings/publishing/ (requires PyPI login, not automatable via CLI/API — did this via browser this session).
+- **`~/.pypirc` `[shipguard]` section**: now has `repository = https://upload.pypi.org/legacy/` (was missing, causing `KeyError: 'repository'` on `twine upload --repository shipguard`). `[distutils]` now has `index-servers = pypi testpypi shipguard superharness` (was also missing).
+- **GitHub auth**: unchanged from prior handoff — `gh auth` active is `newblacc`; `celstnblacc` in keyring. Note the celstnblacc GitHub org itself still exists (spec-kit, superpowers repos live there) — only `shipguard` moved to `artificemachine`.
+
+---
+
+
+## What happened this session
+- Folded the redundant `tests/test_rules_pii_cap_unit.py` into `tests/test_engine_cap.py`. The 50-line file held 1 test (`test_cap_of_zero_is_unlimited`, the PR #20 migration contract) that was already covered by `test_engine_cap.py::TestCapFindingsPerFile::test_cap_disabled_when_zero`. Deletion as PR #28 (`29d75a8`). Test count: 418 → 417.
+- Filed issue #27 (`docs: document v0.5.0 PII notice invisibility in CHANGELOG (fixed in v0.5.1)`) for the v0.5.0 PII notice `Severity.LOW` bug. The bug was that the v0.5.0 PII-local cap emitted a `Severity.LOW` notice, invisible to users on the default `MEDIUM` threshold — a scan capping at 100 PII showed only 100 with no indication of the 900 suppressed. v0.5.1 fixed this engine-side by promoting the notice to `Severity.MEDIUM`, but the v0.5.0 wheel on PyPI still has the bug.
+- Resolved issue #27: new "Retroactive notes" section at the top of `CHANGELOG.md` with the v0.5.0 entry (full reproduction snippet, fix history, cross-references). `docs/ADR-pii-detection.md` cap section now references the severity choice and the v0.5.0 → v0.5.1 fix. PR #29 (`ad32b96`).
+- Closed issue #27. All three engine-cap-arc issues (#19, #22, #27) are now closed.
+
+## Next session — first moves
+1. **No engine-cap follow-up work remains.** All open items are: ad-hoc operator decisions, project-level tooling that lives outside this repo (the `~/.claude/scripts/plan-check.py` patch is in operator-local config, not tracked), and the broken `.venv` (deferred with operator-approval gate). A fresh session can pick up whatever the operator brings; nothing from the engine-cap arc is dangling.
+2. **If the operator has a new feature / refactor / bug-fix**, the pattern is: `/plan-iter <topic>` → review the plan against `~/.claude/scripts/plan-check.py` (now patched, accepts H2 DoD and file:line citations) → `/plan-implement <path>` for execution. The PII and engine-cap plans are templates; the PII review log is the cautionary reference for what plan-design mistakes look like in practice.
+3. **Consider a v0.5.1 → v0.5.2 micro-release** if any further engine-cap issue surfaces. The retroactive CHANGELOG note (issue #27) is the only thing that changed since v0.5.1 shipped; the engine-cap code is identical. A patch release with the doc fix is a low-cost way to make the v0.5.0 → v0.5.1 → v0.5.2 upgrade path obvious for users who read changelogs carefully.
+
+### Operational notes
+- **PyPI token for `shipguard`**: `~/.pypirc` `[shipguard]` section holds the project-scoped token; works. `~/.pypirc` requires `[distutils] index-servers = pypi testpypi shipguard superharness` for twine to recognise non-default section names.
+- **GitHub auth**: `gh auth` active is `newblacc`; `celstnblacc` in keyring. Switch with `gh auth switch --user <user>`.
+- **Test command**: `PYTHONPATH=src /Users/airm2max/.pyenv/versions/3.11.6/bin/python -m pytest tests/` (system pytest on Python 3.11.6). **417 pass / 4 skip / 0 xfailed.** (The previous handoff said 418 — that was before PR #28 deleted the redundant test.)
+- **`.venv` is broken** (missing pytest on Python 3.13). Do not try to fix without operator approval — outside the engine-cap arc's scope.
+- **`plan-check.py` is patched** at `~/.claude/scripts/plan-check.py`. Four fixes: `strip_annotation` handles backticked/paren/PR-cited source references; `pass_3_source_refs` strips `:\d+`/`:Identifier`/`::test_name` suffixes before file existence checks; `pass_6_dod_tests` accepts H2 or H3 DoD headings; `TEST_FILE_RE` anchored on word boundaries. Regression fixture at `~/.claude/scripts/test_plans/PLAN-test-fixture.md` (exits 0).
+- **Engine-cap arc, fully closed**: v0.5.0 (PII rules, PyPI), v0.5.1 (engine-level cap, PII shim deletion, CI fix, PyPI, tag force-moved for the CI fix), `docs/PLAN-engine-cap.md` saved, `docs/ADR-pii-detection.md` updated with the severity-choice note, all three engine-cap-arc issues (#19, #22, #27) closed. PyPI has `shipguard 0.5.1`. The retroactive CHANGELOG note documents the v0.5.0 → v0.5.1 bug for users reading the changelog in order.
+- **`v0.5.1` tag was force-moved** from `d54f893` (post-PR-#24 squash) to `1b5e8c8` (post-PR-#25 squash) to include the CI fixes. The PyPI artifact is unchanged — the engine-cap code is identical between the two commits. The tag annotation explains the move.
+- **`.shipguard.yml`** still has no `max_findings_per_file` set. Default = unlimited. v0.5.0 users who relied on the implicit PII cap of 100 should now set `max_findings_per_file: 100` in their config.
+
+---
 
 ## What happened this session
 - Implemented `docs/PLAN-engine-cap.md` end-to-end across 2 atomic commits on `feat/engine-cap` (5585d1c + dcf06fe), then squash-merged into main as PR #24 with a 3rd commit `0a7b828` bumping `pyproject.toml` to v0.5.1.
