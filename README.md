@@ -55,7 +55,7 @@ pip install "git+https://github.com/artificemachine/shipguard.git"
 You can pin to a branch/tag/commit:
 
 ```bash
-pip install "git+https://github.com/artificemachine/shipguard.git@v0.4.0"
+pip install "git+https://github.com/artificemachine/shipguard.git@v0.5.2"
 ```
 
 After install:
@@ -334,7 +334,7 @@ eval $cmd  # shipguard:ignore SHELL-001, SHELL-002
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/artificemachine/shipguard
-    rev: v0.4.0
+    rev: v0.5.2
     hooks:
       - id: shipguard
 ```
@@ -342,7 +342,7 @@ repos:
 ### GitHub Action
 
 ```yaml
-- uses: artificemachine/shipguard@v0.4.0
+- uses: artificemachine/shipguard@v0.5.2
   with:
     severity: medium
     format: terminal

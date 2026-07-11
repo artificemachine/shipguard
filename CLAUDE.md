@@ -4,7 +4,7 @@
 
 **ShipGuard** is a Python-based SAST (Static Application Security Testing) tool that implements a unified 7-layer security framework. It scans repositories for 60 security vulnerability patterns across Shell scripts, Python, JavaScript/TypeScript, GitHub Actions workflows, and configuration files.
 
-**Version:** 0.4.2
+**Version:** 0.5.2
 **License:** Apache 2.0
 
 **Key Features:**
@@ -419,8 +419,8 @@ brew install shellcheck semgrep
 
 ---
 
-**Last Updated:** 2026-06-03
-**Version:** 0.4.2
+**Last Updated:** 2026-07-11
+**Version:** 0.5.2
 **Maintained By:** DevOpsCelstn
 
 ## Strict Installation Decoupling
