@@ -408,7 +408,7 @@ brew install shellcheck semgrep
 
 ## References
 
-- **Main Project**: [ShipGuard on GitHub](https://github.com/celstnblacc/shipguard)
+- **Main Project**: [ShipGuard on GitHub](https://github.com/artificemachine/shipguard)
 - **7-Layer Framework**: See `docs/7_LAYER_SECURITY_MODEL.md`
 - **Pipeline Guide**: See `docs/PIPELINE.md`
 - **User Guide**: See `README.md`

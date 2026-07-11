@@ -10,7 +10,7 @@ Thanks for your interest in contributing! Here's how to get started.
 ## Setup
 
 ```bash
-git clone https://github.com/celstnblacc/shipguard.git
+git clone https://github.com/artificemachine/shipguard.git
 cd shipguard
 python -m venv .venv
 source .venv/bin/activate
