@@ -24,28 +24,34 @@ class TestRunShellcheck:
         assert result == []
 
     def test_parses_json_output(self, tmp_path):
-        """Correctly parses shellcheck JSON1 output format."""
+        """Correctly parses shellcheck JSON1 output format.
+
+        Regression for a bug found 2026-08-17: real `shellcheck --format=json1`
+        emits a single object `{"comments": [...]}`, not a list of per-file
+        objects. The old fixture here fabricated the wrong shape, matched the
+        (also wrong) production code, and both were wrong the same way — so
+        every test in this file passed while the real integration crashed with
+        AttributeError on any actual finding. See
+        test_matches_real_shellcheck_output below for the non-mocked proof.
+        """
         shell_file = tmp_path / "test.sh"
         shell_file.write_text("#!/bin/bash\neval $input\n")
 
-        mock_output = json.dumps([
-            {
-                "file": str(shell_file),
-                "comments": [
-                    {
-                        "file": str(shell_file),
-                        "line": 2,
-                        "endLine": 2,
-                        "column": 1,
-                        "endColumn": 10,
-                        "level": "warning",
-                        "code": 2046,
-                        "message": "Quote this to prevent word splitting.",
-                        "fix": None,
-                    }
-                ]
-            }
-        ])
+        mock_output = json.dumps({
+            "comments": [
+                {
+                    "file": str(shell_file),
+                    "line": 2,
+                    "endLine": 2,
+                    "column": 1,
+                    "endColumn": 10,
+                    "level": "warning",
+                    "code": 2046,
+                    "message": "Quote this to prevent word splitting.",
+                    "fix": None,
+                }
+            ]
+        })
 
         mock_proc = MagicMock()
         mock_proc.stdout = mock_output
@@ -88,8 +94,7 @@ class TestRunShellcheck:
         shell_file = tmp_path / "test.sh"
         shell_file.write_text("#!/bin/bash\neval $x\n")
 
-        mock_output = json.dumps([{
-            "file": str(shell_file),
+        mock_output = json.dumps({
             "comments": [{
                 "file": str(shell_file),
                 "line": 2,
@@ -98,7 +103,7 @@ class TestRunShellcheck:
                 "message": "Error message",
                 "fix": None,
             }]
-        }])
+        })
         mock_proc = MagicMock()
         mock_proc.stdout = mock_output
 
@@ -122,3 +127,33 @@ class TestRunShellcheck:
                 if mock_run.called:
                     cmd = mock_run.call_args[0][0]
                     assert cmd[0] == "/custom/shellcheck"
+
+    def test_matches_real_shellcheck_output(self, tmp_path):
+        """No mocking: runs the actual shellcheck binary and parses its real
+        output, on a script guaranteed to trigger a warning-level finding
+        (SC2154, a referenced-but-unassigned variable).
+
+        Deliberately not SC2086 (unquoted expansion) — that's "info" level by
+        default and run_shellcheck calls the binary with --severity=warning,
+        so it would silently produce zero findings regardless of whether the
+        parsing is correct, and this test would pass for the wrong reason.
+
+        This is the test that would have caught the json1-shape bug before it
+        shipped — every other test in this file mocks subprocess.run, so a
+        fixture that fabricates the wrong shape and code that expects the same
+        wrong shape agree with each other while both disagree with the real
+        tool. Skips if shellcheck isn't installed rather than mocking it away.
+        """
+        import shutil
+        if not shutil.which("shellcheck"):
+            import pytest
+            pytest.skip("shellcheck not installed")
+
+        shell_file = tmp_path / "unassigned.sh"
+        shell_file.write_text('#!/bin/sh\necho "$undefined_var_used_here"\n')
+
+        result = run_shellcheck([shell_file])
+
+        assert len(result) >= 1, "real shellcheck run produced no findings on a file with a known issue"
+        codes = {f.rule_id for f in result}
+        assert "SHELLCHECK-SC2154" in codes, f"expected SC2154, got {codes}"
