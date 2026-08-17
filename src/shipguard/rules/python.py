@@ -352,6 +352,35 @@ def py_006_hardcoded_secrets(file_path: Path, content: str, config: object = Non
     return findings
 
 
+# A SQL verb on its own is not evidence of SQL. SELECT, UPDATE, CREATE, DROP,
+# GRANT and ALTER are all ordinary English words, and matching them bare made
+# PY-007 fire on help text, log messages and CLI instructions in repositories
+# with no database access at all. Require the verb to appear with the clause
+# that makes it a statement, so "Create a private repo" is prose while
+# "CREATE TABLE {t}" is a query.
+#
+# The gap between verb and clause is bounded rather than greedy: a triple-quoted
+# string is a single AST node in the semantic path, so an unbounded matcher would
+# happily pair a "SELECT" in one paragraph with a "FROM" fifty lines later.
+_SQL_STATEMENT_RE = re.compile(
+    r"""
+    # "select ... from" is also plain English ("select an option from the
+    # menu"), so require FROM to be followed by something table-shaped rather
+    # than an article or pronoun.
+      \bSELECT\b [\s\S]{0,400}? \bFROM\s+
+        (?! (?:the|a|an|this|that|these|those|your|my|our|their|it|them|here|there)\b )
+    | \bINSERT\s+INTO\b
+    | \bUPDATE\b [\s\S]{0,400}? \bSET\b
+    | \bDELETE\s+FROM\b
+    | \bTRUNCATE\s+TABLE\b
+    | \b(?:DROP|ALTER|CREATE)\s+(?:TABLE|DATABASE|SCHEMA|INDEX|VIEW|SEQUENCE)\b
+    | \bCREATE\s+OR\s+REPLACE\b
+    | \bGRANT\b [\s\S]{0,400}? \bON\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
 @register(
     id="PY-007",
     name="sql-string-format",
@@ -366,7 +395,7 @@ def py_007_sql_injection(
 ) -> list[Finding]:
     findings: list[Finding] = []
     tree = kwargs.get("tree")
-    sql_keywords_re = re.compile(r"(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|GRANT)\b", re.IGNORECASE)
+    sql_keywords_re = _SQL_STATEMENT_RE
 
     if tree:
         # Semantic Analysis
@@ -426,11 +455,16 @@ def py_007_sql_injection(
                         )
                     )
     else:
-        # Fallback to Regex
-        sql_keywords = r"(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|GRANT)\b"
-        fstring_pattern = re.compile(rf'f["\'].*{sql_keywords}', re.IGNORECASE)
-        format_pattern = re.compile(rf'["\'].*{sql_keywords}.*["\']\.format\s*\(', re.IGNORECASE)
-        percent_pattern = re.compile(rf'["\'].*{sql_keywords}.*%s.*["\']\s*%', re.IGNORECASE)
+        # Fallback to Regex. Uses the same structural definition as the semantic
+        # path above so both agree on what counts as SQL.
+        sql_keywords = _SQL_STATEMENT_RE.pattern
+        fstring_pattern = re.compile(rf'f["\'].*(?:{sql_keywords})', re.IGNORECASE | re.VERBOSE)
+        format_pattern = re.compile(
+            rf'["\'].*(?:{sql_keywords}).*["\']\.format\s*\(', re.IGNORECASE | re.VERBOSE
+        )
+        percent_pattern = re.compile(
+            rf'["\'].*(?:{sql_keywords}).*%s.*["\']\s*%', re.IGNORECASE | re.VERBOSE
+        )
 
         for i, line in enumerate(content.splitlines(), 1):
             if line.strip().startswith("#"):
