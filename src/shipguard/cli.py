@@ -322,6 +322,16 @@ def scan_staged_cmd(
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Write output to file instead of stdout.",
     ),
+    include_rules: Optional[str] = typer.Option(
+        None,
+        "--include-rules",
+        help="Comma-separated rule IDs to include (e.g., PY-003,SEC-001).",
+    ),
+    exclude_rules: Optional[str] = typer.Option(
+        None,
+        "--exclude-rules",
+        help="Comma-separated rule IDs to exclude.",
+    ),
 ) -> None:
     """Scan only git-staged files (optimized for pre-commit hooks)."""
     resolved_path = path.resolve()
@@ -345,6 +355,21 @@ def scan_staged_cmd(
 
     config = load_config(target_dir=resolved_path)
 
+    include_rule_ids = _parse_rule_csv(include_rules)
+    exclude_rule_ids = _parse_rule_csv(exclude_rules)
+
+    # Validate rule IDs against the loaded registry, same check `scan` applies.
+    if include_rule_ids or exclude_rule_ids:
+        load_builtin_rules()
+        load_custom_rules(_resolve_custom_rule_dirs(resolved_path, config.custom_rules_dirs))
+        known_ids = set(get_registry().keys())
+        unknown_ids = sorted((include_rule_ids | exclude_rule_ids) - known_ids)
+        if unknown_ids:
+            console.print(
+                f"[red]Unknown rule ID(s): {', '.join(unknown_ids)}[/red]"
+            )
+            raise typer.Exit(code=1)
+
     # Apply exclude_paths from config to staged files (mirrors _discover_files logic)
     if config.exclude_paths:
         import pathspec as _pathspec
@@ -366,6 +391,8 @@ def scan_staged_cmd(
         target_dir=resolved_path,
         config=config,
         severity_threshold=threshold,
+        include_rules=include_rule_ids,
+        exclude_rules=exclude_rule_ids,
     )
 
     fmt = fmt.lower()

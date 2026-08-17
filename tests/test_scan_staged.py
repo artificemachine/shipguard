@@ -146,3 +146,95 @@ class TestScanFiles:
         # PY-009 (mktemp) is LOW severity — should be filtered out
         rule_ids = {f.rule_id for f in result.findings}
         assert "PY-009" not in rule_ids
+
+
+class TestScanStagedRuleFilters:
+    """scan-staged lacked --include-rules/--exclude-rules entirely, unlike scan.
+
+    That gap meant the pre-commit hook (which calls scan-staged) had no way to
+    suppress a single false-positive rule per invocation. A .shipguard.yml
+    disable_rules entry works, but it is repo-wide and permanent; sometimes a
+    one-off override is what's needed, exactly as `scan` already allows.
+    """
+
+    def test_exclude_rules_threads_into_scan_files(self, tmp_path):
+        (tmp_path / "vuln.py").write_text("x = 1\n")
+        mock_proc = MagicMock()
+        mock_proc.stdout = "vuln.py\n"
+        mock_proc.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_proc):
+            with patch("shipguard.cli.scan_files") as mock_scan_files:
+                empty_result = ScanResult()
+                empty_result.finish()
+                mock_scan_files.return_value = empty_result
+                result = runner.invoke(
+                    app,
+                    ["scan-staged", str(tmp_path), "--exclude-rules", "PY-007"],
+                )
+
+        assert result.exit_code == 0
+        _, kwargs = mock_scan_files.call_args
+        assert kwargs["exclude_rules"] == {"PY-007"}
+
+    def test_include_rules_threads_into_scan_files(self, tmp_path):
+        (tmp_path / "vuln.py").write_text("x = 1\n")
+        mock_proc = MagicMock()
+        mock_proc.stdout = "vuln.py\n"
+        mock_proc.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_proc):
+            with patch("shipguard.cli.scan_files") as mock_scan_files:
+                empty_result = ScanResult()
+                empty_result.finish()
+                mock_scan_files.return_value = empty_result
+                result = runner.invoke(
+                    app,
+                    ["scan-staged", str(tmp_path), "--include-rules", "PY-003"],
+                )
+
+        assert result.exit_code == 0
+        _, kwargs = mock_scan_files.call_args
+        assert kwargs["include_rules"] == {"PY-003"}
+
+    def test_rejects_unknown_rule_id(self, tmp_path):
+        (tmp_path / "vuln.py").write_text("x = 1\n")
+        mock_proc = MagicMock()
+        mock_proc.stdout = "vuln.py\n"
+        mock_proc.returncode = 0
+
+        with patch("subprocess.run", return_value=mock_proc):
+            result = runner.invoke(
+                app,
+                ["scan-staged", str(tmp_path), "--exclude-rules", "NOPE-999"],
+            )
+
+        assert result.exit_code == 1
+        assert "Unknown rule ID" in result.output
+
+    def test_end_to_end_exclude_rules_suppresses_real_finding(self, tmp_path):
+        """Real git repo, real file, real scan — no mocking.
+
+        Proves the flag actually suppresses a finding through the whole path,
+        not just that a kwarg gets threaded through a mock.
+        """
+        import subprocess as sp
+
+        sp.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        sp.run(["git", "config", "user.email", "t@example.com"], cwd=tmp_path, check=True)
+        sp.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+        vuln = tmp_path / "vuln.py"
+        vuln.write_text('query = f"SELECT id FROM users WHERE name = \'{name}\'"\n')
+        sp.run(["git", "add", "vuln.py"], cwd=tmp_path, check=True)
+
+        without_exclude = runner.invoke(
+            app, ["scan-staged", str(tmp_path), "--severity", "high"]
+        )
+        assert without_exclude.exit_code == 1, without_exclude.output
+
+        with_exclude = runner.invoke(
+            app,
+            ["scan-staged", str(tmp_path), "--severity", "high", "--exclude-rules", "PY-007"],
+        )
+        assert with_exclude.exit_code == 0, with_exclude.output
