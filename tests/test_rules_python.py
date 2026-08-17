@@ -153,6 +153,52 @@ class TestPY007SqlInjection:
         findings = py_007_sql_injection(Path("test.py"), content)
         assert len(findings) == 0
 
+    def test_ignores_sql_verb_used_as_plain_english(self):
+        """A bare SQL verb in prose is not a query.
+
+        Regression for a false positive found 2026-08-17 in ai-forge, a project
+        scaffolder with no SQL anywhere: the rule matched the word "Create" in a
+        help message and reported CWE-89.
+        """
+        content = (
+            'print(f"""\n'
+            "  3. Create remote and push (private):\n"
+            "       gh repo create {owner}/{name} --private --source=. --push\n"
+            '""")\n'
+        )
+        findings = py_007_sql_injection(Path("test.py"), content)
+        assert findings == []
+
+    def test_ignores_other_sql_verbs_as_english(self):
+        for text in (
+            'msg = f"Update the {thing} before you continue"',
+            'msg = f"Select a {option} from the menu"',
+            'msg = f"Grant access to {user} in the console"',
+            'msg = f"Drop the {item} into the folder"',
+            'msg = f"Alter your {setting} in preferences"',
+        ):
+            findings = py_007_sql_injection(Path("test.py"), text)
+            assert findings == [], f"false positive on: {text}"
+
+    def test_still_detects_real_sql_statements(self):
+        for text in (
+            'q = f"SELECT id FROM users WHERE name = \'{name}\'"',
+            'q = f"INSERT INTO users (name) VALUES (\'{name}\')"',
+            'q = f"UPDATE users SET name = \'{name}\' WHERE id = {uid}"',
+            'q = f"DELETE FROM users WHERE id = {uid}"',
+            'q = f"DROP TABLE {table}"',
+            'q = f"CREATE TABLE {table} (id INT)"',
+            'q = f"ALTER TABLE {table} ADD COLUMN x INT"',
+        ):
+            findings = py_007_sql_injection(Path("test.py"), text)
+            assert len(findings) == 1, f"missed real SQL injection: {text}"
+            assert findings[0].severity == Severity.HIGH
+
+    def test_detects_sql_built_with_format(self):
+        content = 'q = "SELECT id FROM users WHERE name = \'{}\'".format(name)'
+        findings = py_007_sql_injection(Path("test.py"), content)
+        assert len(findings) == 1
+
 
 class TestPY008PickleLoad:
     def test_detects_pickle_load(self):
