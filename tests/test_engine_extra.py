@@ -155,3 +155,42 @@ def test_scan_counts_skipped_files_when_worker_raises(tmp_path, monkeypatch):
     monkeypatch.setattr("shipguard.engine._scan_file", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
     res = scan(tmp_path, severity_threshold=Severity.LOW)
     assert res.files_skipped >= 1
+
+
+def test_rule_config_skip_paths_documented_in_init_template_is_honored(tmp_path):
+    """.shipguard.yml's rule_config.<RULE-ID>.skip_paths is documented in the
+    `shipguard init` template (config.py) but was never wired into the scan
+    path — every finding still fired regardless of skip_paths. Confirmed by
+    an A/B against disable_rules (which does work) on 2026-08-24 during a
+    real false-positive triage (SHELL-002 firing on a script that
+    intentionally interpolates unquoted variables inside a heredoc, where
+    quoting them would corrupt the generated output)."""
+    target = tmp_path / "repo"
+    scripts_dir = target / "commands"
+    scripts_dir.mkdir(parents=True)
+    flagged = scripts_dir / "regen-callgraph.sh"
+    flagged.write_text("#!/usr/bin/env bash\nfile=$1\nrm $file\n")
+    other = target / "other.sh"
+    other.write_text("#!/usr/bin/env bash\nfile=$1\nrm $file\n")
+
+    config = Config(rule_config={"SHELL-002": {"skip_paths": ["commands/regen-callgraph.sh"]}})
+    result = scan(target, config=config, severity_threshold=Severity.LOW)
+
+    flagged_hits = [f for f in result.findings if f.file_path == flagged and f.rule_id == "SHELL-002"]
+    other_hits = [f for f in result.findings if f.file_path == other and f.rule_id == "SHELL-002"]
+    assert flagged_hits == []
+    assert other_hits != []
+
+
+def test_scan_file_skip_paths_matches_relative_to_target_dir(tmp_path):
+    """Unit-level: _scan_file resolves skip_paths against file_path relative
+    to target_dir, not the absolute path (so patterns like
+    "commands/x.sh" — anchored, no leading **/ — work as documented)."""
+    target = tmp_path / "repo"
+    (target / "commands").mkdir(parents=True)
+    flagged = target / "commands" / "regen-callgraph.sh"
+    flagged.write_text("#!/usr/bin/env bash\nfile=$1\nrm $file\n")
+
+    config = Config(rule_config={"SHELL-002": {"skip_paths": ["commands/regen-callgraph.sh"]}})
+    findings = _scan_file(flagged, config, Severity.LOW, target_dir=target)
+    assert [f for f in findings if f.rule_id == "SHELL-002"] == []

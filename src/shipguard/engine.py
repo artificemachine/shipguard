@@ -159,12 +159,25 @@ def _get_suppressed_rules(lines: list[str], line_number: int) -> set[str]:
     return suppressed
 
 
+def _rule_skip_paths_spec(config: Config, rule_id: str) -> pathspec.PathSpec | None:
+    """Build the pathspec for a rule's `rule_config.<rule_id>.skip_paths`, or
+    None if the rule has none configured."""
+    rule_cfg = config.rule_config.get(rule_id)
+    if not rule_cfg:
+        return None
+    skip_paths = rule_cfg.get("skip_paths")
+    if not skip_paths:
+        return None
+    return pathspec.PathSpec.from_lines("gitignore", skip_paths)
+
+
 def _scan_file(
     file_path: Path,
     config: Config,
     severity_threshold: Severity,
     include_rules: set[str] | None = None,
     excluded_rules: set[str] | None = None,
+    target_dir: Path | None = None,
 ) -> list[Finding]:
     """Scan a single file with all applicable rules."""
     try:
@@ -177,6 +190,14 @@ def _scan_file(
     excluded = excluded_rules or set()
     findings: list[Finding] = []
     lines = content.splitlines()
+
+    if target_dir is not None:
+        try:
+            rel_path = file_path.relative_to(target_dir)
+        except ValueError:
+            rel_path = file_path
+    else:
+        rel_path = file_path
 
     # Pre-parse AST if language is supported
     tree = None
@@ -204,6 +225,9 @@ def _scan_file(
         if config.use_rust_secrets and rule.id.startswith("SEC-"):
             continue
         if rule.func is None:
+            continue
+        skip_spec = _rule_skip_paths_spec(config, rule.id)
+        if skip_spec is not None and skip_spec.match_file(str(rel_path)):
             continue
 
         rule_findings = rule.func(file_path, content, config=config, tree=tree)
@@ -233,6 +257,7 @@ def _run_parallel_scans(
     include_rule_ids: set[str],
     excluded_rule_ids: set[str],
     max_workers: int,
+    target_dir: Path | None = None,
 ) -> tuple[list[Finding], int]:
     """Run _scan_file in parallel; returns (findings, files_skipped)."""
     all_findings: list[Finding] = []
@@ -241,7 +266,7 @@ def _run_parallel_scans(
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
             pool.submit(
-                _scan_file, f, config, threshold, include_rule_ids, excluded_rule_ids
+                _scan_file, f, config, threshold, include_rule_ids, excluded_rule_ids, target_dir
             ): f
             for f in files
         }
@@ -303,7 +328,7 @@ def scan_files(
     result.rules_applied = rules_applied
 
     all_findings, skipped = _run_parallel_scans(
-        files, config, threshold, include_rule_ids, excluded_rule_ids, max_workers
+        files, config, threshold, include_rule_ids, excluded_rule_ids, max_workers, target_dir
     )
     result.files_skipped = skipped
     all_findings.sort(
@@ -392,7 +417,7 @@ def scan(
             all_findings.append(finding)
 
     parallel_findings, skipped = _run_parallel_scans(
-        files, config, threshold, include_rule_ids, excluded_rule_ids, max_workers
+        files, config, threshold, include_rule_ids, excluded_rule_ids, max_workers, target_dir
     )
     result.files_skipped += skipped
     all_findings.extend(parallel_findings)
