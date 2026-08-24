@@ -22,7 +22,10 @@ JS_EXTS = [".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"]
 )
 def js_001_eval(file_path: Path, content: str, config: object = None, **kwargs) -> list[Finding]:
     findings: list[Finding] = []
-    pattern = re.compile(r"\beval\s*\(")
+    # Negative lookbehind excludes a dotted method call (model.eval(),
+    # range.eval(), etc.) — not the global eval() function and cannot
+    # execute arbitrary code the way eval() can.
+    pattern = re.compile(r"(?<!\.)\beval\s*\(")
     for i, line in enumerate(content.splitlines(), 1):
         stripped = line.strip()
         if stripped.startswith("//") or stripped.startswith("*"):
@@ -132,11 +135,16 @@ def js_003_symlink_following(file_path: Path, content: str, config: object = Non
 )
 def js_004_prototype_pollution(file_path: Path, content: str, config: object = None, **kwargs) -> list[Finding]:
     findings: list[Finding] = []
-    # Detect custom deep merge functions or Object.assign with spread
+    # Detect custom deep merge functions or Object.assign with an empty
+    # target. Object/array spread ({...a, ...b}) is intentionally NOT
+    # matched here: spread copies own enumerable properties via
+    # CopyDataProperties -> [[DefineOwnProperty]], which does not invoke
+    # Object.prototype's inherited __proto__ setter the way Object.assign's
+    # [[Set]] semantics can — it is not the same vulnerability class as a
+    # hand-rolled recursive deep-merge function.
     merge_pattern = re.compile(
         r"""(?:function\s+(?:deep[Mm]erge|merge[Dd]eep|extend)|"""
-        r"""Object\.assign\s*\(\s*\{\s*\}|"""
-        r"""\.\.\.\w+\s*,\s*\.\.\.\w+)"""
+        r"""Object\.assign\s*\(\s*\{\s*\})"""
     )
     lines = content.splitlines()
 
